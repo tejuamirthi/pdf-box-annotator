@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Rectangle Drawing Test</title>
+    <style>
+        body { margin: 20px; }
+        #test-area { 
+            width: 600px; 
+            height: 400px; 
+            border: 1px solid #ccc; 
+            position: relative; 
+            background: #f9f9f9;
+            cursor: crosshair;
+        }
+        .rectangle {
+            position: absolute;
+            border: 2px solid #ff0000;
+            background-color: rgba(255, 0, 0, 0.1);
+            cursor: pointer;
+            user-select: none;
+        }
+        .resize-handle {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background-color: #0066cc;
+            cursor: se-resize;
+            bottom: -4px;
+            right: -4px;
+        }
+        #log { 
+            margin-top: 20px; 
+            padding: 10px; 
+            border: 1px solid #ddd; 
+            background: #f0f0f0;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>Rectangle Drawing Test</h1>
+    <p>Click and drag to create rectangles. They should only be finalized when you release the mouse.</p>
+    
+    <div id="test-area"></div>
+    
+    <div id="log">Test Log:\n</div>
+    
+    <script>
+        class TestRectDrawing {
+            constructor() {
+                this.isDrawing = false;
+                this.startX = 0;
+                this.startY = 0;
+                this.currentRect = null;
+                this.rectangles = [];
+                this.testArea = document.getElementById('test-area');
+                this.log = document.getElementById('log');
+                
+                this.setupEvents();
+                this.logMessage('Test initialized - ready to draw rectangles');
+            }
+            
+            setupEvents() {
+                this.testArea.addEventListener('mousedown', (e) => this.handleMouseDown(e));
+                this.testArea.addEventListener('mousemove', (e) => this.handleMouseMove(e));
+                this.testArea.addEventListener('mouseup', (e) => this.handleMouseUp(e));
+            }
+            
+            getCoordinates(event) {
+                const rect = this.testArea.getBoundingClientRect();
+                return {
+                    x: event.clientX - rect.left,
+                    y: event.clientY - rect.top
+                };
+            }
+            
+            handleMouseDown(event) {
+                if (event.target.classList.contains('rectangle')) {
+                    this.logMessage('Clicked on existing rectangle - no new drawing');
+                    return;
+                }
+                
+                this.isDrawing = true;
+                const coords = this.getCoordinates(event);
+                this.startX = coords.x;
+                this.startY = coords.y;
+                this.logMessage(`Started drawing at (${coords.x}, ${coords.y})`);
+            }
+            
+            handleMouseMove(event) {
+                if (!this.isDrawing) return;
+                
+                const coords = this.getCoordinates(event);
+                
+                if (!this.currentRect) {
+                    this.currentRect = this.createPreviewRectangle(this.startX, this.startY, 0, 0);
+                    this.logMessage('Created preview rectangle');
+                }
+                
+                const width = Math.abs(coords.x - this.startX);
+                const height = Math.abs(coords.y - this.startY);
+                const x = Math.min(this.startX, coords.x);
+                const y = Math.min(this.startY, coords.y);
+                
+                this.currentRect.style.left = x + 'px';
+                this.currentRect.style.top = y + 'px';
+                this.currentRect.style.width = width + 'px';
+                this.currentRect.style.height = height + 'px';
+            }
+            
+            handleMouseUp(event) {
+                if (!this.isDrawing) return;
+                
+                this.isDrawing = false;
+                
+                if (this.currentRect) {
+                    const coords = this.getCoordinates(event);
+                    const width = Math.abs(coords.x - this.startX);
+                    const height = Math.abs(coords.y - this.startY);
+                    
+                    if (width > 5 && height > 5) {
+                        const x = Math.min(this.startX, coords.x);
+                        const y = Math.min(this.startY, coords.y);
+                        
+                        // Remove preview
+                        this.currentRect.remove();
+                        
+                        // Create final rectangle
+                        const finalRect = this.createFinalRectangle(x, y, width, height);
+                        this.rectangles.push(finalRect);
+                        
+                        this.logMessage(`Finalized rectangle: x=${x}, y=${y}, w=${width}, h=${height}`);
+                    } else {
+                        this.currentRect.remove();
+                        this.logMessage('Rectangle too small - removed');
+                    }
+                }
+                
+                this.currentRect = null;
+            }
+            
+            createPreviewRectangle(x, y, width, height) {
+                const rect = document.createElement('div');
+                rect.className = 'rectangle';
+                rect.style.left = x + 'px';
+                rect.style.top = y + 'px';
+                rect.style.width = width + 'px';
+                rect.style.height = height + 'px';
+                rect.style.opacity = '0.7';
+                rect.style.pointerEvents = 'none';
+                
+                this.testArea.appendChild(rect);
+                return rect;
+            }
+            
+            createFinalRectangle(x, y, width, height) {
+                const rect = document.createElement('div');
+                rect.className = 'rectangle';
+                rect.style.left = x + 'px';
+                rect.style.top = y + 'px';
+                rect.style.width = width + 'px';
+                rect.style.height = height + 'px';
+                
+                const resizeHandle = document.createElement('div');
+                resizeHandle.className = 'resize-handle';
+                rect.appendChild(resizeHandle);
+                
+                rect.addEventListener('click', () => {
+                    this.logMessage(`Clicked rectangle at (${x}, ${y}) with size ${width}x${height}`);
+                });
+                
+                this.testArea.appendChild(rect);
+                return rect;
+            }
+            
+            logMessage(message) {
+                this.log.textContent += new Date().toLocaleTimeString() + ': ' + message + '\n';
+            }
+        }
+        
+        new TestRectDrawing();
+    </script>
+</body>
+</html>

@@ -8,8 +8,11 @@ class PDFAnnotator {
         this.rectangles = new Map(); // Map of pageNumber -> Array of rectangles
         this.isDrawing = false;
         this.isResizing = false;
+        this.isDragging = false;
         this.startX = 0;
         this.startY = 0;
+        this.dragStartX = 0;
+        this.dragStartY = 0;
         this.currentRect = null;
         this.selectedRect = null;
         this.scale = 1;
@@ -126,6 +129,17 @@ class PDFAnnotator {
         };
     }
     
+    getViewerCoordinates(event) {
+        const viewerRect = document.getElementById('pdfViewer').getBoundingClientRect();
+        const clientX = event.clientX || (event.touches && event.touches[0].clientX);
+        const clientY = event.clientY || (event.touches && event.touches[0].clientY);
+        
+        return {
+            x: clientX - viewerRect.left,
+            y: clientY - viewerRect.top
+        };
+    }
+    
     handleMouseDown(event) {
         if (event.target.classList.contains('resize-handle')) {
             this.isResizing = true;
@@ -133,17 +147,34 @@ class PDFAnnotator {
             return;
         }
         
-        this.isDrawing = true;
-        const coords = this.getCanvasCoordinates(event);
-        this.startX = coords.x;
-        this.startY = coords.y;
+        if (event.target.classList.contains('rectangle')) {
+            this.isDragging = true;
+            this.currentRect = event.target;
+            const coords = this.getViewerCoordinates(event);
+            const rectData = JSON.parse(this.currentRect.dataset.rect);
+            this.dragStartX = coords.x - rectData.x;
+            this.dragStartY = coords.y - rectData.y;
+            this.deselectAllRectangles();
+            this.currentRect.classList.add('selected');
+            this.selectedRect = this.currentRect;
+            return;
+        }
         
-        this.deselectAllRectangles();
+        // Only start drawing if clicking on canvas/viewer area (not on existing rectangles)
+        if (event.target === this.canvas || event.target.id === 'pdfViewer') {
+            this.isDrawing = true;
+            const coords = this.getViewerCoordinates(event);
+            this.startX = coords.x;
+            this.startY = coords.y;
+            this.currentRect = null; // Reset current rectangle
+            
+            this.deselectAllRectangles();
+        }
     }
     
     handleMouseMove(event) {
         if (this.isResizing && this.currentRect) {
-            const coords = this.getCanvasCoordinates(event);
+            const coords = this.getViewerCoordinates(event);
             const rect = this.currentRect;
             const rectData = JSON.parse(rect.dataset.rect);
             
@@ -162,23 +193,44 @@ class PDFAnnotator {
             return;
         }
         
+        if (this.isDragging && this.currentRect) {
+            const coords = this.getViewerCoordinates(event);
+            const rectData = JSON.parse(this.currentRect.dataset.rect);
+            
+            const newX = Math.max(0, Math.min(coords.x - this.dragStartX, this.canvas.width - rectData.width));
+            const newY = Math.max(0, Math.min(coords.y - this.dragStartY, this.canvas.height - rectData.height));
+            
+            this.currentRect.style.left = newX + 'px';
+            this.currentRect.style.top = newY + 'px';
+            
+            // Update rectangle data
+            rectData.x = newX;
+            rectData.y = newY;
+            this.currentRect.dataset.rect = JSON.stringify(rectData);
+            
+            this.updateRectangleInStorage(rectData);
+            return;
+        }
+        
         if (!this.isDrawing) return;
         
-        const coords = this.getCanvasCoordinates(event);
+        const coords = this.getViewerCoordinates(event);
         
-        if (this.currentRect) {
-            const width = Math.abs(coords.x - this.startX);
-            const height = Math.abs(coords.y - this.startY);
-            const x = Math.min(this.startX, coords.x);
-            const y = Math.min(this.startY, coords.y);
-            
-            this.currentRect.style.left = x + 'px';
-            this.currentRect.style.top = y + 'px';
-            this.currentRect.style.width = width + 'px';
-            this.currentRect.style.height = height + 'px';
-        } else {
-            this.currentRect = this.createRectangleElement(this.startX, this.startY, 0, 0);
+        // Create temporary preview rectangle element on first mouse move if it doesn't exist
+        if (!this.currentRect) {
+            this.currentRect = this.createPreviewRectangle(this.startX, this.startY, 0, 0);
         }
+        
+        // Update rectangle dimensions based on current mouse position
+        const width = Math.abs(coords.x - this.startX);
+        const height = Math.abs(coords.y - this.startY);
+        const x = Math.min(this.startX, coords.x);
+        const y = Math.min(this.startY, coords.y);
+        
+        this.currentRect.style.left = x + 'px';
+        this.currentRect.style.top = y + 'px';
+        this.currentRect.style.width = width + 'px';
+        this.currentRect.style.height = height + 'px';
     }
     
     handleMouseUp(event) {
@@ -188,18 +240,30 @@ class PDFAnnotator {
             return;
         }
         
+        if (this.isDragging) {
+            this.isDragging = false;
+            this.currentRect = null;
+            return;
+        }
+        
         if (!this.isDrawing) return;
         
         this.isDrawing = false;
         
         if (this.currentRect) {
-            const coords = this.getCanvasCoordinates(event);
+            const coords = this.getViewerCoordinates(event);
             const width = Math.abs(coords.x - this.startX);
             const height = Math.abs(coords.y - this.startY);
             
             if (width > 5 && height > 5) {
                 const x = Math.min(this.startX, coords.x);
                 const y = Math.min(this.startY, coords.y);
+                
+                // Remove the preview rectangle
+                this.currentRect.remove();
+                
+                // Create the final rectangle with full functionality
+                const finalRect = this.createRectangleElement(x, y, width, height, true);
                 
                 const rectData = {
                     id: Date.now(),
@@ -210,7 +274,7 @@ class PDFAnnotator {
                     page: this.currentPage
                 };
                 
-                this.currentRect.dataset.rect = JSON.stringify(rectData);
+                finalRect.dataset.rect = JSON.stringify(rectData);
                 this.addRectangleToStorage(rectData);
             } else {
                 this.currentRect.remove();
@@ -239,7 +303,21 @@ class PDFAnnotator {
         this.handleMouseUp(event);
     }
     
-    createRectangleElement(x, y, width, height) {
+    createPreviewRectangle(x, y, width, height) {
+        const rect = document.createElement('div');
+        rect.className = 'rectangle';
+        rect.style.left = x + 'px';
+        rect.style.top = y + 'px';
+        rect.style.width = width + 'px';
+        rect.style.height = height + 'px';
+        rect.style.opacity = '0.7'; // Make preview slightly transparent
+        rect.style.pointerEvents = 'none'; // Disable interactions during preview
+        
+        document.getElementById('pdfViewer').appendChild(rect);
+        return rect;
+    }
+    
+    createRectangleElement(x, y, width, height, isComplete = false) {
         const rect = document.createElement('div');
         rect.className = 'rectangle';
         rect.style.left = x + 'px';
@@ -247,13 +325,16 @@ class PDFAnnotator {
         rect.style.width = width + 'px';
         rect.style.height = height + 'px';
         
-        // Add resize handle
-        const resizeHandle = document.createElement('div');
-        resizeHandle.className = 'resize-handle';
-        rect.appendChild(resizeHandle);
-        
-        // Add click event for coordinate logging
-        rect.addEventListener('click', (e) => this.handleRectangleClick(e));
+        // Only add interactive elements if rectangle is complete
+        if (isComplete) {
+            // Add resize handle
+            const resizeHandle = document.createElement('div');
+            resizeHandle.className = 'resize-handle';
+            rect.appendChild(resizeHandle);
+            
+            // Add click event for coordinate logging
+            rect.addEventListener('click', (e) => this.handleRectangleClick(e));
+        }
         
         document.getElementById('pdfViewer').appendChild(rect);
         return rect;
@@ -279,9 +360,21 @@ class PDFAnnotator {
         const widthPoints = (rectData.width / this.scale) * 72 / 96;
         const heightPoints = (rectData.height / this.scale) * 72 / 96;
         
+        // Calculate right and bottom coordinates
+        const rightPoints = xPoints + widthPoints;
+        const bottomPoints = yPoints + heightPoints;
+        
+        // Calculate position ratios
+        const leftRatio = (xPoints / pageWidthPoints * 100).toFixed(1);
+        const rightRatio = (rightPoints / pageWidthPoints * 100).toFixed(1);
+        const topRatio = (yPoints / pageHeightPoints * 100).toFixed(1);
+        const bottomRatio = (bottomPoints / pageHeightPoints * 100).toFixed(1);
+        
         const logMessage = `Page Number: ${rectData.page}\n` +
                           `Page Size: Width=${pageWidthPoints.toFixed(1)}, Height=${pageHeightPoints.toFixed(1)} (points)\n` +
-                          `Rectangle Coordinates: X=${xPoints.toFixed(1)}, Y=${yPoints.toFixed(1)}, Width=${widthPoints.toFixed(1)}, Height=${heightPoints.toFixed(1)} (points)\n\n`;
+                          `Rectangle Coordinates: X=${xPoints.toFixed(1)}, Y=${yPoints.toFixed(1)}, Width=${widthPoints.toFixed(1)}, Height=${heightPoints.toFixed(1)} (points)\n` +
+                          `Rectangle Bounds: Left=${xPoints.toFixed(1)}, Right=${rightPoints.toFixed(1)}, Top=${yPoints.toFixed(1)}, Bottom=${bottomPoints.toFixed(1)} (points)\n` +
+                          `Position Ratios: Left=${leftRatio}%, Right=${rightRatio}%, Top=${topRatio}%, Bottom=${bottomRatio}% of page\n\n`;
         
         const logOutput = document.getElementById('logOutput');
         logOutput.textContent += logMessage;
@@ -309,7 +402,7 @@ class PDFAnnotator {
         const pageRectangles = this.rectangles.get(pageNumber) || [];
         
         pageRectangles.forEach(rectData => {
-            const rect = this.createRectangleElement(rectData.x, rectData.y, rectData.width, rectData.height);
+            const rect = this.createRectangleElement(rectData.x, rectData.y, rectData.width, rectData.height, true);
             rect.dataset.rect = JSON.stringify(rectData);
         });
     }
