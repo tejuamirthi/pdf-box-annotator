@@ -364,17 +364,17 @@ class PDFAnnotator {
         const rightPoints = xPoints + widthPoints;
         const bottomPoints = yPoints + heightPoints;
         
-        // Calculate position ratios
-        const leftRatio = (xPoints / pageWidthPoints * 100).toFixed(1);
-        const rightRatio = (rightPoints / pageWidthPoints * 100).toFixed(1);
-        const topRatio = (yPoints / pageHeightPoints * 100).toFixed(1);
-        const bottomRatio = (bottomPoints / pageHeightPoints * 100).toFixed(1);
+        // Calculate position ratios (0-1 range)
+        const leftRatio = (xPoints / pageWidthPoints).toFixed(3);
+        const rightRatio = (rightPoints / pageWidthPoints).toFixed(3);
+        const topRatio = (yPoints / pageHeightPoints).toFixed(3);
+        const bottomRatio = (bottomPoints / pageHeightPoints).toFixed(3);
         
         const logMessage = `Page Number: ${rectData.page}\n` +
                           `Page Size: Width=${pageWidthPoints.toFixed(1)}, Height=${pageHeightPoints.toFixed(1)} (points)\n` +
                           `Rectangle Coordinates: X=${xPoints.toFixed(1)}, Y=${yPoints.toFixed(1)}, Width=${widthPoints.toFixed(1)}, Height=${heightPoints.toFixed(1)} (points)\n` +
                           `Rectangle Bounds: Left=${xPoints.toFixed(1)}, Right=${rightPoints.toFixed(1)}, Top=${yPoints.toFixed(1)}, Bottom=${bottomPoints.toFixed(1)} (points)\n` +
-                          `Position Ratios: Left=${leftRatio}%, Right=${rightRatio}%, Top=${topRatio}%, Bottom=${bottomRatio}% of page\n\n`;
+                          `Position Ratios: Left=${leftRatio}, Right=${rightRatio}, Top=${topRatio}, Bottom=${bottomRatio} of page\n\n`;
         
         const logOutput = document.getElementById('logOutput');
         logOutput.textContent += logMessage;
