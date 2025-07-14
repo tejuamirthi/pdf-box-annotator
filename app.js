@@ -130,13 +130,13 @@ class PDFAnnotator {
     }
     
     getViewerCoordinates(event) {
-        const viewerRect = document.getElementById('pdfViewer').getBoundingClientRect();
+        const canvasRect = this.canvas.getBoundingClientRect();
         const clientX = event.clientX || (event.touches && event.touches[0].clientX);
         const clientY = event.clientY || (event.touches && event.touches[0].clientY);
         
         return {
-            x: clientX - viewerRect.left,
-            y: clientY - viewerRect.top
+            x: clientX - canvasRect.left,
+            y: clientY - canvasRect.top
         };
     }
     
@@ -200,8 +200,12 @@ class PDFAnnotator {
             const newX = Math.max(0, Math.min(coords.x - this.dragStartX, this.canvas.width - rectData.width));
             const newY = Math.max(0, Math.min(coords.y - this.dragStartY, this.canvas.height - rectData.height));
             
-            this.currentRect.style.left = newX + 'px';
-            this.currentRect.style.top = newY + 'px';
+            // Position rectangle relative to canvas within the viewer
+            const canvasRect = this.canvas.getBoundingClientRect();
+            const viewerRect = document.getElementById('pdfViewer').getBoundingClientRect();
+            
+            this.currentRect.style.left = (newX + (canvasRect.left - viewerRect.left)) + 'px';
+            this.currentRect.style.top = (newY + (canvasRect.top - viewerRect.top)) + 'px';
             
             // Update rectangle data
             rectData.x = newX;
@@ -227,8 +231,12 @@ class PDFAnnotator {
         const x = Math.min(this.startX, coords.x);
         const y = Math.min(this.startY, coords.y);
         
-        this.currentRect.style.left = x + 'px';
-        this.currentRect.style.top = y + 'px';
+        // Position rectangle relative to canvas within the viewer
+        const canvasRect = this.canvas.getBoundingClientRect();
+        const viewerRect = document.getElementById('pdfViewer').getBoundingClientRect();
+        
+        this.currentRect.style.left = (x + (canvasRect.left - viewerRect.left)) + 'px';
+        this.currentRect.style.top = (y + (canvasRect.top - viewerRect.top)) + 'px';
         this.currentRect.style.width = width + 'px';
         this.currentRect.style.height = height + 'px';
     }
@@ -306,8 +314,13 @@ class PDFAnnotator {
     createPreviewRectangle(x, y, width, height) {
         const rect = document.createElement('div');
         rect.className = 'rectangle';
-        rect.style.left = x + 'px';
-        rect.style.top = y + 'px';
+        
+        // Position rectangle relative to canvas within the viewer
+        const canvasRect = this.canvas.getBoundingClientRect();
+        const viewerRect = document.getElementById('pdfViewer').getBoundingClientRect();
+        
+        rect.style.left = (x + (canvasRect.left - viewerRect.left)) + 'px';
+        rect.style.top = (y + (canvasRect.top - viewerRect.top)) + 'px';
         rect.style.width = width + 'px';
         rect.style.height = height + 'px';
         rect.style.opacity = '0.7'; // Make preview slightly transparent
@@ -320,8 +333,13 @@ class PDFAnnotator {
     createRectangleElement(x, y, width, height, isComplete = false) {
         const rect = document.createElement('div');
         rect.className = 'rectangle';
-        rect.style.left = x + 'px';
-        rect.style.top = y + 'px';
+        
+        // Position rectangle relative to canvas within the viewer
+        const canvasRect = this.canvas.getBoundingClientRect();
+        const viewerRect = document.getElementById('pdfViewer').getBoundingClientRect();
+        
+        rect.style.left = (x + (canvasRect.left - viewerRect.left)) + 'px';
+        rect.style.top = (y + (canvasRect.top - viewerRect.top)) + 'px';
         rect.style.width = width + 'px';
         rect.style.height = height + 'px';
         
@@ -351,6 +369,38 @@ class PDFAnnotator {
         this.logRectangleCoordinates(rectData);
     }
     
+    captureRectangleImage(rectData) {
+        // Create a temporary canvas to capture the rectangle area
+        const tempCanvas = document.createElement('canvas');
+        const tempCtx = tempCanvas.getContext('2d');
+        
+        // Set canvas size to rectangle size (with some padding)
+        const padding = 10;
+        tempCanvas.width = rectData.width + (padding * 2);
+        tempCanvas.height = rectData.height + (padding * 2);
+        
+        // Fill with white background
+        tempCtx.fillStyle = 'white';
+        tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+        
+        // Draw the captured area from the main canvas
+        tempCtx.drawImage(
+            this.canvas,
+            rectData.x - padding, rectData.y - padding, // Source position
+            rectData.width + (padding * 2), rectData.height + (padding * 2), // Source size
+            0, 0, // Destination position
+            tempCanvas.width, tempCanvas.height // Destination size
+        );
+        
+        // Draw rectangle border on the captured image
+        tempCtx.strokeStyle = '#ff0000';
+        tempCtx.lineWidth = 2;
+        tempCtx.strokeRect(padding, padding, rectData.width, rectData.height);
+        
+        // Convert to data URL
+        return tempCanvas.toDataURL('image/png');
+    }
+    
     logRectangleCoordinates(rectData) {
         const pageWidthPoints = this.pageWidth / this.scale * 72 / 96; // Convert to points
         const pageHeightPoints = this.pageHeight / this.scale * 72 / 96;
@@ -370,23 +420,58 @@ class PDFAnnotator {
         const topRatio = (yPoints / pageHeightPoints).toFixed(3);
         const bottomRatio = (bottomPoints / pageHeightPoints).toFixed(3);
         
-        const logMessage = `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-                          `📄 PAGE ${rectData.page}\n` +
-                          `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-                          `📐 Page Dimensions: ${pageWidthPoints.toFixed(1)} × ${pageHeightPoints.toFixed(1)} points\n\n` +
-                          `📍 Rectangle Position & Size:\n` +
-                          `   X: ${xPoints.toFixed(1)} pts    Y: ${yPoints.toFixed(1)} pts\n` +
-                          `   Width: ${widthPoints.toFixed(1)} pts    Height: ${heightPoints.toFixed(1)} pts\n\n` +
-                          `📏 Rectangle Bounds:\n` +
-                          `   Left: ${xPoints.toFixed(1)} pts    Right: ${rightPoints.toFixed(1)} pts\n` +
-                          `   Top: ${yPoints.toFixed(1)} pts     Bottom: ${bottomPoints.toFixed(1)} pts\n\n` +
-                          `📊 Position Ratios (0-1 scale):\n` +
-                          `   Left: ${leftRatio}    Right: ${rightRatio}\n` +
-                          `   Top: ${topRatio}     Bottom: ${bottomRatio}\n\n`;
+        // Capture rectangle image
+        const imageDataUrl = this.captureRectangleImage(rectData);
+        
+        // Create log entry element
+        const logEntry = document.createElement('div');
+        logEntry.className = 'log-entry';
+        
+        // Create timestamp
+        const timestamp = new Date().toLocaleTimeString();
+        
+        logEntry.innerHTML = `
+            <div class="log-entry-header">
+                <span class="log-entry-title">📄 Page ${rectData.page}</span>
+                <span class="log-entry-timestamp">${timestamp}</span>
+            </div>
+            
+            <div class="rectangle-preview">
+                <img src="${imageDataUrl}" alt="Rectangle snapshot" style="
+                    width: 100%; 
+                    height: auto; 
+                    border: 1px solid #ddd; 
+                    border-radius: 4px;
+                    max-height: 120px;
+                    object-fit: contain;
+                " />
+            </div>
+            
+            <div class="log-output">
+📐 Page: ${pageWidthPoints.toFixed(1)} × ${pageHeightPoints.toFixed(1)} pts
+
+📍 Position & Size:
+   X: ${xPoints.toFixed(1)} pts    Y: ${yPoints.toFixed(1)} pts
+   W: ${widthPoints.toFixed(1)} pts    H: ${heightPoints.toFixed(1)} pts
+
+📏 Bounds:
+   L: ${xPoints.toFixed(1)}  R: ${rightPoints.toFixed(1)}
+   T: ${yPoints.toFixed(1)}  B: ${bottomPoints.toFixed(1)}
+
+📊 Ratios (0-1):
+   L: ${leftRatio}  R: ${rightRatio}
+   T: ${topRatio}  B: ${bottomRatio}
+            </div>
+        `;
         
         const logOutput = document.getElementById('logOutput');
-        logOutput.textContent += logMessage;
-        logOutput.classList.remove('hidden');
+        
+        // Clear placeholder text on first entry
+        if (logOutput.children.length === 1 && logOutput.children[0].style.fontStyle === 'italic') {
+            logOutput.innerHTML = '';
+        }
+        
+        logOutput.appendChild(logEntry);
         
         // Scroll to bottom
         logOutput.scrollTop = logOutput.scrollHeight;
@@ -433,8 +518,7 @@ class PDFAnnotator {
     
     clearLogs() {
         const logOutput = document.getElementById('logOutput');
-        logOutput.textContent = 'Rectangle Coordinates Log:\n';
-        logOutput.classList.add('hidden');
+        logOutput.innerHTML = '<div style="color: #6c757d; font-style: italic; text-align: center; padding: 20px;">Click on rectangles to view their coordinates and captured content</div>';
     }
     
     goToPrevPage() {
