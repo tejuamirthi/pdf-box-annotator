@@ -370,11 +370,19 @@ class PDFAnnotator {
         const topRatio = (yPoints / pageHeightPoints).toFixed(3);
         const bottomRatio = (bottomPoints / pageHeightPoints).toFixed(3);
         
-        const logMessage = `Page Number: ${rectData.page}\n` +
-                          `Page Size: Width=${pageWidthPoints.toFixed(1)}, Height=${pageHeightPoints.toFixed(1)} (points)\n` +
-                          `Rectangle Coordinates: X=${xPoints.toFixed(1)}, Y=${yPoints.toFixed(1)}, Width=${widthPoints.toFixed(1)}, Height=${heightPoints.toFixed(1)} (points)\n` +
-                          `Rectangle Bounds: Left=${xPoints.toFixed(1)}, Right=${rightPoints.toFixed(1)}, Top=${yPoints.toFixed(1)}, Bottom=${bottomPoints.toFixed(1)} (points)\n` +
-                          `Position Ratios: Left=${leftRatio}, Right=${rightRatio}, Top=${topRatio}, Bottom=${bottomRatio} of page\n\n`;
+        const logMessage = `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                          `📄 PAGE ${rectData.page}\n` +
+                          `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                          `📐 Page Dimensions: ${pageWidthPoints.toFixed(1)} × ${pageHeightPoints.toFixed(1)} points\n\n` +
+                          `📍 Rectangle Position & Size:\n` +
+                          `   X: ${xPoints.toFixed(1)} pts    Y: ${yPoints.toFixed(1)} pts\n` +
+                          `   Width: ${widthPoints.toFixed(1)} pts    Height: ${heightPoints.toFixed(1)} pts\n\n` +
+                          `📏 Rectangle Bounds:\n` +
+                          `   Left: ${xPoints.toFixed(1)} pts    Right: ${rightPoints.toFixed(1)} pts\n` +
+                          `   Top: ${yPoints.toFixed(1)} pts     Bottom: ${bottomPoints.toFixed(1)} pts\n\n` +
+                          `📊 Position Ratios (0-1 scale):\n` +
+                          `   Left: ${leftRatio}    Right: ${rightRatio}\n` +
+                          `   Top: ${topRatio}     Bottom: ${bottomRatio}\n\n`;
         
         const logOutput = document.getElementById('logOutput');
         logOutput.textContent += logMessage;
