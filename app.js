@@ -366,7 +366,29 @@ class PDFAnnotator {
         this.selectedRect = event.currentTarget;
         
         const rectData = JSON.parse(event.currentTarget.dataset.rect);
-        this.logRectangleCoordinates(rectData);
+        
+        // Debug: Get actual visual position of rectangle element
+        const rectElement = event.currentTarget;
+        const rectStyle = rectElement.getBoundingClientRect();
+        const canvasRect = this.canvas.getBoundingClientRect();
+        
+        // Calculate actual position relative to canvas
+        const actualX = rectStyle.left - canvasRect.left;
+        const actualY = rectStyle.top - canvasRect.top;
+        
+        console.log('Debug - Stored coordinates:', rectData.x, rectData.y, rectData.width, rectData.height);
+        console.log('Debug - Visual position:', actualX, actualY, rectStyle.width, rectStyle.height);
+        
+        // Use actual visual coordinates for capture instead of stored ones
+        const correctedRectData = {
+            ...rectData,
+            x: actualX,
+            y: actualY,
+            width: rectStyle.width,
+            height: rectStyle.height
+        };
+        
+        this.logRectangleCoordinates(correctedRectData);
     }
     
     captureRectangleImage(rectData) {
@@ -383,19 +405,29 @@ class PDFAnnotator {
         tempCtx.fillStyle = 'white';
         tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
         
+        // Use the rectangle coordinates (these should be canvas coordinates)
+        const sourceX = Math.max(0, Math.round(rectData.x) - padding);
+        const sourceY = Math.max(0, Math.round(rectData.y) - padding);
+        const sourceWidth = Math.min(Math.round(rectData.width) + (padding * 2), this.canvas.width - sourceX);
+        const sourceHeight = Math.min(Math.round(rectData.height) + (padding * 2), this.canvas.height - sourceY);
+        
+        // Calculate destination position to account for clipping
+        const destX = sourceX === rectData.x - padding ? 0 : padding - (rectData.x - sourceX);
+        const destY = sourceY === rectData.y - padding ? 0 : padding - (rectData.y - sourceY);
+        
         // Draw the captured area from the main canvas
         tempCtx.drawImage(
             this.canvas,
-            rectData.x - padding, rectData.y - padding, // Source position
-            rectData.width + (padding * 2), rectData.height + (padding * 2), // Source size
-            0, 0, // Destination position
-            tempCanvas.width, tempCanvas.height // Destination size
+            sourceX, sourceY, // Source position (clipped to canvas bounds)
+            sourceWidth, sourceHeight, // Source size (clipped to canvas bounds)
+            destX, destY, // Destination position
+            sourceWidth, sourceHeight // Destination size
         );
         
         // Draw rectangle border on the captured image
         tempCtx.strokeStyle = '#ff0000';
         tempCtx.lineWidth = 2;
-        tempCtx.strokeRect(padding, padding, rectData.width, rectData.height);
+        tempCtx.strokeRect(padding, padding, Math.round(rectData.width), Math.round(rectData.height));
         
         // Convert to data URL
         return tempCanvas.toDataURL('image/png');
