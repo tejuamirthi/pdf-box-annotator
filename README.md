@@ -61,6 +61,8 @@ Position Ratios: Left=0.163, Right=0.245, Top=0.316, Bottom=0.410 of page
 - Local web server (for file serving)
 
 ### Installation
+
+#### Local Development
 1. Clone or download the project files
 2. Place all files in a directory
 3. Start a local web server:
@@ -68,6 +70,17 @@ Position Ratios: Left=0.163, Right=0.245, Top=0.316, Bottom=0.410 of page
    python3 -m http.server 1234
    ```
 4. Open your browser and navigate to `http://localhost:1234`
+
+#### GitHub Pages Deployment
+This project is automatically deployed to GitHub Pages when changes are pushed to the master branch.
+
+**Live Demo**: [https://tejuamirthi.github.io/pdf-box-annotator/](https://tejuamirthi.github.io/pdf-box-annotator/)
+
+To deploy your own version:
+1. Fork this repository
+2. Go to your repository Settings → Pages
+3. Select "GitHub Actions" as the source
+4. The site will automatically deploy when you push changes
 
 ### Usage
 
